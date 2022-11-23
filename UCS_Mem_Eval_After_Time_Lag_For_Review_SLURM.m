@@ -1,0 +1,47 @@
+%function [ ] = MEMORY_EVALUATOR_ODE_SLURM1(I,J)
+clear;
+clc;
+    time_lag_param = [10, 100]; 
+    load ODE_New Bin_US_R_CS_Genes; % Load the result of memory evaluation
+    ModelId = 1;
+
+    Prev_Mem = Bin_US_R_CS_Genes{ModelId}; % Get results of current model
+    Prev_Mem = Prev_Mem(Prev_Mem(:,1)==1,:); % Get only UCS memory of current model
+    [M, N] = size(Prev_Mem);
+
+    addpath(sprintf('Biomodels/Model%d',ModelId));
+    x0 = Initialize_ODE();
+    [ Ref, RscaleUp, Fd, simCnt ] = Initialize_Recheck(x0); % Get some initial parameters Fd, Sim_Cnt etc
+
+    All_Time_Lag_Mem = zeros(M,N,(1+length(time_lag_param))); % This 3D table stores initial and all successive time lag memories
+    All_Time_Lag_Mem(:,:,1) = Prev_Mem;
+    Num_All_Time_Lag_mem = zeros(1,(1+length(time_lag_param)));
+    Num_All_Time_Lag_mem(1) = M;
+
+
+    for i = 1:length(time_lag_param) % for each time lag param do
+        cur_time_lag = time_lag_param(i);
+        New_Mem = [];
+        for j = 1:M
+            cur_row = Prev_Mem(j,:); % Get current memory of the model
+            US_R_Info = cur_row(1,2:5); % Get US, US_UpDn, R, R_Up_Dn of current memory
+            Gene_Init = cur_row(1,8:end); % Get last state of all species
+            [ X1 ] = stimulateRelaxSingle( Gene_Init, [], [],  Fd, (simCnt*cur_time_lag)); % Relax for successive time 
+            Genes_Time_Lag = X1(end,:);
+            [ MemUS, Genes_Leave ] = Test_US_Memory( X1, US_R_Info, Fd, simCnt );
+            new_row = [MemUS, US_R_Info, [0, 0], Genes_Leave ];
+            New_Mem = [New_Mem; new_row];
+        end
+        New_Mem = New_Mem(New_Mem(:,1)==1,:); % Get only UCS memory of current model
+        Num_All_Time_Lag_mem(i+1) = size(New_Mem ,1);
+        All_Time_Lag_Mem(1:size(New_Mem,1),:,(i+1)) = New_Mem;
+    end
+
+    % Remove current folder from path
+        rmpath(sprintf('Biomodels/Model%d',ModelId)); % Remove the model from current path
+
+     % Save results
+         fileName = sprintf('Out_%s.mat',int2str(ModelId));
+         cd OUT6;
+         save(fileName,'Num_All_Time_Lag_mem','All_Time_Lag_Mem');    
+%end 

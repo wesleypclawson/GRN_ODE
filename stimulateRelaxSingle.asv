@@ -1,0 +1,34 @@
+function [ X ] = stimulateRelaxSingle( x0, ST, UpDn,  Fd, simCnt )
+% This function performs the experiments administering multiple stimuli
+% in sequence
+    
+    % Mix noise
+    %x0 = Mix_Noise(x0);
+    disp(US_R_Info(1))
+    % Initialize variables
+    X = zeros(simCnt+1,length(x0)); % Simulation of all genes over simCnt time steps
+    T = zeros(simCnt+1,1); % All simulation time
+    t0 = 0; % Initial time
+    h = 0.01; % Steps of ODE solver
+    x1 = x0;
+    k = 1;
+    
+    % Do for each ODE solver
+    for i = 1:(simCnt/10)
+        tf = t0+h*10; % Final time of a ODE solver
+        tspan = t0:h:tf; % Time span of the ODE solver
+        [t,x]=ode23tb(@f,tspan,x1);
+        x1 = x(end,:).';
+        if length(ST) == 1 % If one stimulus
+            x1(ST) = Fd(UpDn,ST); % Stimulate and clamp
+        elseif length(ST) == 2 % if two stimuli
+            x1(ST(1)) = Fd(UpDn(1),ST(1)); % Stimulate and clamp
+            x1(ST(2)) = Fd(UpDn(2),ST(2)); % Stimulate and clamp
+        end
+        X(k:k+10,:) = x; % Store simulation of the network performed by current ODE solver
+        T(k:k+10,:) = t; % Store time steps of current ODE solver
+        
+        k = k+10;
+        t0 = tf;
+    end
+end

@@ -1,0 +1,99 @@
+function [ L1_US_R_CS_Genes ] = AL( X1, Ref, US_R_Info, CS_List, Fd, RscaleUp, simCnt )
+
+    % Perform learning experiments for a given CS
+    US = US_R_Info(1);
+    UpDnUS = US_R_Info(2);
+    R = US_R_Info(3);
+    
+    L1_US_R_CS_Genes = [];
+    Temp = [];
+    
+    C = size(CS_List,1); % number of CS present in different activation status
+    % Perform steps for associative learning
+    for KK = 1:C    % Do associative learning for each CS
+       
+        % Checks for Associative Learning
+        
+        % Call UCS_Alone_Asso to test if UCS alone can turn the
+        % candidate CS to actual CS
+        Bool1 = 999;
+        CS = CS_List(KK,1);
+        UpDnCS = CS_List(KK,2);
+        %% Check for Transfer memory
+        ST = [];
+        ST = US;
+        UpDnST = UpDnUS;
+        [ Bool1, ~, Genes_Final, ~, ~, ~ ] = UCS_NS_Asso( X1, Ref, ST, UpDnST, CS_List(KK,:), R, Fd, RscaleUp, simCnt );     
+        
+        if Bool1 == 1 % If UCS alone can turn candidate CS to actual CS
+            if US_R_Info(1) ~= CS_List(KK,1)
+                Temp = [ 3, US_R_Info, CS_List(KK,:), Genes_Final]; % Assigning memory Type 3 as Transfer Memory
+            end
+            L1_US_R_CS_Genes = [L1_US_R_CS_Genes; Temp];
+            Temp = [];
+            
+       % Check for Associative Memory    
+        else % Check US paired with candidate CS can turn candidate CS to actual CS
+            ST = [];
+            ST = [ US, CS ];
+            UpDnST = [ UpDnUS, UpDnCS ];
+            Bool2 = 999; % Resetting Boolean variable
+            [ Bool2, Bool_Pair, Genes_Final, E2, E3, UpDnR ] = UCS_NS_Asso( X1, Ref, ST, UpDnST, CS_List(KK,:), R, Fd, RscaleUp, simCnt );
+            if Bool2 == 1 % If actual association established between {US,CS}
+                if US_R_Info(1) ~= CS_List(KK,1)
+                    Temp = [ 4, US_R_Info, CS_List(KK,:), Genes_Final]; % Assigning memory Type 4 as actual Associative Memory
+                end
+                L1_US_R_CS_Genes = [L1_US_R_CS_Genes; Temp];
+                Temp = [];
+                
+                % Leave the network for N times and let it go into an attract
+                    ST = [];
+                    UpDnST = [];
+                    E4 = stimulateRelaxSingle( Genes_Final.', ST, UpDnST,  Fd, simCnt );
+                    Genes_Leave = E4(end,:);
+
+                % Compare and detect if R has flipped (Up/Down regulated)
+                    [ MemLRAM ] = DetectMem( E2, E3, E4, R, UpDnR );
+                
+                %  Check long Recall
+                if (MemLRAM ~= 0) % No Memory
+                    if US_R_Info(1) ~= CS_List(KK,1)
+                        Temp = [5, US_R_Info, CS_List(KK,:), Genes_Leave]; % Assigning memory Type 5 as Long Recall
+                    end
+                    L1_US_R_CS_Genes = [L1_US_R_CS_Genes; Temp];
+                    Temp = [];
+
+                else % Short recall
+                    if US_R_Info(1) ~= CS_List(KK,1)
+                        Temp = [6, US_R_Info, CS_List(KK,:), Genes_Final]; % Assigning memory Type 6 as Short Recall
+                    end
+                    L1_US_R_CS_Genes = [L1_US_R_CS_Genes; Temp];
+                    Temp = [];
+                end
+            elseif (Bool2 ~= 1) && (Bool_Pair == 1) % If Pairing passed but R did not flip with CS
+                % Leave the network for N times and let it go into an attractor
+                    ST = [];
+                    UpDnST = [];
+                    E5 = stimulateRelaxSingle( Genes_Final.', ST, UpDnST,  Fd, simCnt );
+                    Genes_Leave = E5(end,:);
+
+                % Compare and detect if R has flipped (Up/Down regulated)
+                    UpDnR = DetectRegR( E2, E5, Ref((4*simCnt+1):(5*simCnt),:), R, RscaleUp );
+                
+                % Check for Consolidation Memory
+                    if UpDnR ~= 0 % R flipped (Up/Down regulated)
+                        if US_R_Info(1) ~= CS_List(KK,1)
+                            Temp = [7, US_R_Info, CS_List(KK,:), Genes_Leave]; % Assigning memory Type 7 as consolidation memory
+                        end
+                        L1_US_R_CS_Genes = [L1_US_R_CS_Genes; Temp];
+                        Temp = [];
+
+                    else % If no memory
+                        Temp = [8, US_R_Info, CS_List(KK,:), Genes_Final]; % Assigning memory Type 8 as no memory
+                        L1_US_R_CS_Genes = [L1_US_R_CS_Genes; Temp];
+                        Temp = [];
+                    end
+            end
+        end
+    end % End for
+end % End function

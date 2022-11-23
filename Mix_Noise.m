@@ -1,0 +1,8 @@
+function [x0] = Mix_Noise(x0)
+% This function mix gaussian noise into a random species
+    N = length(x0);
+    Noise = randi(10,1,N)./100;
+    Pos_Neg = (2*randi([0 1],1,N)-1);
+    Noise = (Noise.*Pos_Neg)';
+    x0 = (x0+x0.*Noise);
+end
